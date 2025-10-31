@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProjectShop — Professional Services & Products</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        .gradient-text {
+            background: linear-gradient(90deg, #4f46e5, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .product-card, .service-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .product-card:hover, .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .floating-cart {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+        .cart-notification {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            z-index: 100;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .modal-header {
+            padding: 24px 24px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .modal-body {
+            padding: 16px 24px 24px;
+        }
+        .service-feature {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .service-feature i {
+            margin-right: 12px;
+            margin-top: 4px;
+            color: #4f46e5;
+        }
+        .pricing-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .pricing-card:hover {
+            border-color: #4f46e5;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+        }
+        .pricing-card.popular {
+            border-color: #4f46e5;
+            position: relative;
+            transform: scale(1.05);
+        }
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4f46e5;
+            color: white;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .auth-modal {
+            max-width: 400px;
+        }
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .auth-tab.active {
+            border-bottom-color: #4f46e5;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #4f46e5;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            min-width: 180px;
+            padding: 8px 0;
+            z-index: 50;
+            display: none;
+        }
+        .user-dropdown.show {
+            display: block;
+        }
+        .user-dropdown-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-dropdown-item:hover {
+            background: #f8fafc;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-slate-50 to-white text-slate-800 antialiased">
+    <!-- Navigation -->
+    <header class="bg-white/80 backdrop-blur sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="#" class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold">PS</div>
+                    <div class="hidden sm:block">
+                        <div class="text-lg font-bold gradient-text">ProjectShop</div>
+                        <div class="text-xs text-slate-500">Service & Product Marketplace</div>
+                    </div>
+                </a>
+                <nav class="hidden md:flex items-center gap-6">
+                    <a href="#services" class="hover:text-indigo-600 font-medium transition-colors">Services</a>
+                    <a href="#shop" class="hover:text-indigo-600 font-medium transition-colors">Shop</a>
+                    <a href="#about" class="hover:text-indigo-600 font-medium transition-colors">About</a>
+                    <a href="#contact" class="hover:text-indigo-600 font-medium transition-colors">Contact</a>
+                </nav>
+                <div class="flex items-center gap-3">
+                    <button id="cartBtn" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm shadow hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Cart (<span id="cartCount">0</span>)</span>
+                    </button>
+                    <div id="authButtons" class="hidden sm:flex items-center gap-2">
+                        <button id="loginBtn" class="px-4 py-2 border rounded-md text-sm hover:bg-slate-50 transition-colors">Login</button>
+                        <button id="signupBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 transition-colors">Sign Up</button>
+                    </div>
+                    <div id="userProfile" class="hidden relative">
+                        <div id="userAvatar" class="user-avatar"></div>
+                        <div id="userDropdown" class="user-dropdown">
+                            <div class="user-dropdown-item">
+                                <i class="fas fa-user text-slate-500"></i>
+                                <span id="userName">User</span>
+                            </div>
+                            <div class="user-dropdown-item">
+                                <i class="fas fa-shopping-bag text-slate-500"></i>
+                                <span>Orders</span>
+                            </div>
+                            <div class="border-t my-1"></div>
+                            <div id="logoutBtn" class="user-dropdown-item text-red-500">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Logout</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="mobileMenuBtn" class="md:hidden p-2 rounded-md hover:bg-slate-100 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobileMenu" class="md:hidden hidden border-t bg-white">
+            <div class="px-4 py-3 flex flex-col gap-2">
+                <a href="#services" class="py-2 px-2 hover:bg-slate-50 rounded-md transition-colors">Services</a>
+                <a href="#shop" class="py-2 px-2 hover:bg-slate-50 rounded-md transition-colors">Shop</a>
+                <a href="#about" class="py-2 px-2 hover:bg-slate-50 rounded-md transition-colors">About</a>
+                <a href="#contact" class="py-2 px-2 hover:bg-slate-50 rounded-md transition-colors">Contact</a>
+                <div id="mobileAuthButtons" class="pt-2 border-t mt-2">
+                    <button id="mobileLoginBtn" class="w-full py-2 px-2 text-left hover:bg-slate-50 rounded-md transition-colors">Login</button>
+                    <button id="mobileSignupBtn" class="w-full py-2 px-2 text-left hover:bg-slate-50 rounded-md transition-colors">Sign Up</button>
+                </div>
+                <div id="mobileUserProfile" class="hidden pt-2 border-t mt-2">
+                    <div class="py-2 px-2 flex items-center gap-2">
+                        <div id="mobileUserAvatar" class="user-avatar w-6 h-6 text-xs"></div>
+                        <span id="mobileUserName">User</span>
+                    </div>
+                    <button id="mobileLogoutBtn" class="w-full py-2 px-2 text-left text-red-500 hover:bg-slate-50 rounded-md transition-colors">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <main>
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="fade-in">
+                    <div class="inline-block px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-sm font-medium mb-4">
+                        <i class="fas fa-rocket mr-1"></i> Expert Team for Your Projects
+                    </div>
+                    <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight">Need a Project Done? <span class="gradient-text">We're Here</span></h1>
+                    <p class="mt-4 text-slate-600 text-lg">Specialized services and custom products — you choose, we deliver. From Facebook page to professional online store.</p>
+                    <div class="mt-8 flex gap-3 flex-wrap">
+                        <a href="#services" class="px-6 py-3 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                            <i class="fas fa-laptop-code"></i> View Services
+                        </a>
+                        <a href="#shop" class="px-6 py-3 rounded-md border hover:bg-slate-50 transition-colors flex items-center gap-2">
+                            <i class="fas fa-shopping-bag"></i> Browse Shop
+                        </a>
+                    </div>
+
+                    <div class="mt-10 grid grid-cols-3 gap-4 text-sm">
+                        <div class="p-4 bg-white rounded-lg shadow-sm text-center service-card">
+                            <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-2">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="font-semibold">Guarantee</div>
+                            <div class="text-slate-500">3 Months Support</div>
+                        </div>
+                        <div class="p-4 bg-white rounded-lg shadow-sm text-center service-card">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2">
+                                <i class="fas fa-palette"></i>
+                            </div>
+                            <div class="font-semibold">Customization</div>
+                            <div class="text-slate-500">Tailored to Your Needs</div>
+                        </div>
+                        <div class="p-4 bg-white rounded-lg shadow-sm text-center service-card">
+                            <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mx-auto mb-2">
+                                <i class="fas fa-shipping-fast"></i>
+                            </div>
+                            <div class="font-semibold">Fast Delivery</div>
+                            <div class="text-slate-500">On-Time Completion</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="fade-in">
+                    <div class="relative">
+                        <div class="rounded-2xl overflow-hidden shadow-xl">
+                            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80" alt="preview" class="w-full h-auto object-cover">
+                        </div>
+                        <div class="absolute -bottom-4 -left-4 bg-white p-4 rounded-lg shadow-lg">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                                <span class="text-sm font-medium">Order Now</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Services Section -->
+        <section id="services" class="py-16 bg-gradient-to-b from-slate-50 to-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold">Our Services</h2>
+                    <p class="text-slate-500 mt-4 max-w-2xl mx-auto">We build any type of project you need — web, mobile, graphics, from idea to delivery.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="p-6 bg-white rounded-xl shadow hover:shadow-md transition-all service-card border border-slate-100">
+                        <div class="w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mb-4">
+                            <i class="fas fa-code text-xl"></i>
+                        </div>
+                        <div class="text-indigo-600 font-semibold text-lg">Web Development</div>
+                        <p class="mt-3 text-slate-600">JSP, Java, Oracle, HTML/CSS — from university/bureau projects to commercial websites.</p>
+                        <div class="mt-4 flex gap-2">
+                            <button class="service-details-btn text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors" data-service="web-development">Details →</button>
+                        </div>
+                    </div>
+
+                    <div class="p-6 bg-white rounded-xl shadow hover:shadow-md transition-all service-card border border-slate-100">
+                        <div class="w-12 h-12 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center mb-4">
+                            <i class="fas fa-palette text-xl"></i>
+                        </div>
+                        <div class="text-indigo-600 font-semibold text-lg">UI/UX & Design</div>
+                        <p class="mt-3 text-slate-600">Professional layouts, mobile-first design, and branding.</p>
+                        <div class="mt-4 flex gap-2">
+                            <button class="service-details-btn text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors" data-service="ui-design">Details →</button>
+                        </div>
+                    </div>
+
+                    <div class="p-6 bg-white rounded-xl shadow hover:shadow-md transition-all service-card border border-slate-100">
+                        <div class="w-12 h-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center mb-4">
+                            <i class="fas fa-mobile-alt text-xl"></i>
+                        </div>
+                        <div class="text-indigo-600 font-semibold text-lg">Mobile Apps</div>
+                        <p class="mt-3 text-slate-600">Android and iOS application development with UI/UX design.</p>
+                        <div class="mt-4 flex gap-2">
+                            <button class="service-details-btn text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors" data-service="mobile-apps">Details →</button>
+                        </div>
+                    </div>
+
+                    <div class="p-6 bg-white rounded-xl shadow hover:shadow-md transition-all service-card border border-slate-100">
+                        <div class="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mb-4">
+                            <i class="fas fa-box text-xl"></i>
+                        </div>
+                        <div class="text-indigo-600 font-semibold text-lg">Ready-to-Sell Products</div>
+                        <p class="mt-3 text-slate-600">Templates, themes, and small tools you can sell directly.</p>
+                        <div class="mt-4 flex gap-2">
+                            <button class="service-details-btn text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors" data-service="ready-products">Details →</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Shop Section -->
+        <section id="shop" class="py-16 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-8">
+                    <h2 class="text-3xl font-bold mb-4 md:mb-0">Popular Products</h2>
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm text-slate-500">Sort</label>
+                        <select id="sortSelect" class="border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500">
+                            <option value="newest">Newest</option>
+                            <option value="bestselling">Best Selling</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="productsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- Products will be dynamically loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" class="py-16 bg-gradient-to-r from-slate-50 to-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold">Why Choose Us?</h2>
+                    <p class="text-slate-500 mt-4 max-w-2xl mx-auto">Our team works on projects for many students and live clients — we deliver all types of projects, small to large.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-5 bg-white rounded-xl shadow-sm border border-slate-100">
+                                <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <h3 class="font-semibold text-lg">Experienced Team</h3>
+                                <p class="mt-2 text-slate-600 text-sm">Developers and designers with experience in various projects</p>
+                            </div>
+                            <div class="p-5 bg-white rounded-xl shadow-sm border border-slate-100">
+                                <div class="w-10 h-10 rounded-lg bg-green-100 text-green-600 flex items-center justify-center mb-3">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h3 class="font-semibold text-lg">Timely Delivery</h3>
+                                <p class="mt-2 text-slate-600 text-sm">Work delivered before deadlines</p>
+                            </div>
+                            <div class="p-5 bg-white rounded-xl shadow-sm border border-slate-100">
+                                <div class="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mb-3">
+                                    <i class="fas fa-headset"></i>
+                                </div>
+                                <h3 class="font-semibold text-lg">24/7 Support</h3>
+                                <p class="mt-2 text-slate-600 text-sm">Necessary support provided even after project completion</p>
+                            </div>
+                            <div class="p-5 bg-white rounded-xl shadow-sm border border-slate-100">
+                                <div class="w-10 h-10 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center mb-3">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <h3 class="font-semibold text-lg">Affordable Pricing</h3>
+                                <p class="mt-2 text-slate-600 text-sm">Quality work at very reasonable prices</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <div class="flex items-start mb-4">
+                                <div class="text-yellow-400 text-xl mr-1">
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                </div>
+                            </div>
+                            <blockquote class="text-slate-700 text-lg">"Very fast work and professional service — great customer service! My project was delivered on time and the quality was perfect."</blockquote>
+                            <div class="mt-6 flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">R</div>
+                                <div>
+                                    <div class="font-semibold">Rahat</div>
+                                    <div class="text-sm text-slate-500">Startup Founder</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="py-16 bg-slate-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold">Contact Us</h2>
+                    <p class="text-slate-500 mt-4">Discuss your project with us now</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-indigo-600 text-white p-8 rounded-xl shadow-lg">
+                        <h4 class="text-2xl font-bold mb-4">Contact Information</h4>
+                        <p class="mb-6">You can message us directly on our Facebook page or fill out the form below.</p>
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center">
+                                    <i class="fab fa-facebook-f"></i>
+                                </div>
+                                <div>
+                                    <div class="font-medium">Facebook Page</div>
+                                    <a href="#" class="text-indigo-100 hover:text-white underline">facebook.com/projectshop</a>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div>
+                                    <div class="font-medium">Email</div>
+                                    <a href="mailto:hello@projectshop.com" class="text-indigo-100 hover:text-white">hello@projectshop.com</a>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center">
+                                    <i class="fas fa-phone"></i>
+                                </div>
+                                <div>
+                                    <div class="font-medium">Phone</div>
+                                    <a href="tel:+8801XXXXXXXXX" class="text-indigo-100 hover:text-white">+880 1XXXXXXXXX</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <form id="contactForm" class="bg-white p-8 rounded-xl shadow-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Name</label>
+                                <input id="nameInput" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="Your name" required />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Email / Phone</label>
+                                <input id="contactInput" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="example@mail.com" required />
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Subject</label>
+                            <input id="subjectInput" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="Your project type" required />
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                            <textarea id="messageInput" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" rows="4" placeholder="What you need..." required></textarea>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button type="submit" id="submitBtn" class="px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                                <i class="fas fa-paper-plane"></i> Send Message
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <footer class="bg-slate-800 text-white py-8">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold">PS</div>
+                            <div class="text-lg font-bold">ProjectShop</div>
+                        </div>
+                        <p class="text-slate-300 text-sm">Expert services and products for your projects</p>
+                    </div>
+                    <div>
+                        <h5 class="font-semibold mb-4">Links</h5>
+                        <ul class="space-y-2 text-slate-300 text-sm">
+                            <li><a href="#services" class="hover:text-white transition-colors">Services</a></li>
+                            <li><a href="#shop" class="hover:text-white transition-colors">Shop</a></li>
+                            <li><a href="#about" class="hover:text-white transition-colors">About</a></li>
+                            <li><a href="#contact" class="hover:text-white transition-colors">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h5 class="font-semibold mb-4">Services</h5>
+                        <ul class="space-y-2 text-slate-300 text-sm">
+                            <li><a href="#" class="hover:text-white transition-colors">Web Development</a></li>
+                            <li><a href="#" class="hover:text-white transition-colors">UI/UX Design</a></li>
+                            <li><a href="#" class="hover:text-white transition-colors">Mobile Apps</a></li>
+                            <li><a href="#" class="hover:text-white transition-colors">Ready Products</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h5 class="font-semibold mb-4">Social Media</h5>
+                        <div class="flex gap-3">
+                            <a href="#" class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center hover:bg-indigo-600 transition-colors">
+                                <i class="fab fa-facebook-f"></i>
+                            </a>
+                            <a href="#" class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center hover:bg-blue-400 transition-colors">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                            <a href="#" class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center hover:bg-pink-600 transition-colors">
+                                <i class="fab fa-instagram"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-t border-slate-700 mt-8 pt-6 flex flex-col md:flex-row justify-between items-center text-sm text-slate-400">
+                    <div>© 2025 ProjectShop. All rights reserved.</div>
+                    <div class="flex gap-4 mt-4 md:mt-0">
+                        <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                        <a href="#" class="hover:text-white transition-colors">Terms</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- Floating Cart Button -->
+    <button id="floatingCartBtn" class="floating-cart w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg hover:bg-indigo-700 transition-colors">
+        <i class="fas fa-shopping-cart text-xl"></i>
+        <span id="floatingCartCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+    </button>
+
+    <!-- AUTH MODAL -->
+    <div id="authModal" class="modal-overlay hidden">
+        <div class="modal-content auth-modal">
+            <div class="modal-header">
+                <h3 id="authModalTitle" class="text-xl font-bold text-slate-800">Login to Your Account</h3>
+                <button id="closeAuthModal" class="text-slate-500 hover:text-slate-700 text-xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="auth-tabs">
+                    <div id="loginTab" class="auth-tab active">Login</div>
+                    <div id="signupTab" class="auth-tab">Sign Up</div>
+                </div>
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                        <input id="loginEmail" type="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="your@email.com" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                        <input id="loginPassword" type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="••••••••" required />
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input id="rememberMe" type="checkbox" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                            <label for="rememberMe" class="ml-2 block text-sm text-slate-700">Remember me</label>
+                        </div>
+                        <a href="#" class="text-sm text-indigo-600 hover:text-indigo-500">Forgot password?</a>
+                    </div>
+                    <button type="submit" id="loginSubmitBtn" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </form>
+                <form id="signupForm" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                        <input id="signupName" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="John Doe" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                        <input id="signupEmail" type="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="your@email.com" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                        <input id="signupPassword" type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="••••••••" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
+                        <input id="signupConfirmPassword" type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-colors" placeholder="••••••••" required />
+                    </div>
+                    <div class="flex items-center">
+                        <input id="agreeTerms" type="checkbox" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" required />
+                        <label for="agreeTerms" class="ml-2 block text-sm text-slate-700">I agree to the <a href="#" class="text-indigo-600 hover:text-indigo-500">Terms and Conditions</a></label>
+                    </div>
+                    <button type="submit" id="signupSubmitBtn" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </button>
+                </form>
+                <div class="mt-4 text-center text-sm text-slate-500">
+                    By continuing, you agree to our Terms of Service and Privacy Policy.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CART MODAL -->
+    <div id="cartModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="font-semibold text-lg">Your Cart</h4>
+                <button id="closeCart" class="text-slate-500 hover:text-slate-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="cartItems" class="mt-4 space-y-3 text-sm text-slate-700">Cart is empty</div>
+            <div class="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
+                <div class="font-bold text-lg">Total: $<span id="cartTotal">0</span></div>
+                <div class="flex gap-2">
+                    <button id="closeCartBtn" class="px-4 py-2 border rounded-lg hover:bg-slate-50 transition-colors">Close</button>
+                    <button id="checkoutBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Checkout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SERVICE DETAILS MODAL -->
+    <div id="serviceModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h3 id="serviceModalTitle" class="text-2xl font-bold text-slate-800"></h3>
+                    <p id="serviceModalSubtitle" class="text-slate-600 mt-1"></p>
+                </div>
+                <button id="closeServiceModal" class="text-slate-500 hover:text-slate-700 text-xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="serviceModalContent">
+                    <!-- Content will be dynamically loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Product data
+        const products = [
+            {
+                id: 1,
+                name: "Web Template - Business",
+                description: "Responsive and SEO-friendly business template",
+                price: 1500,
+                image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                category: "template",
+                tags: ["bestseller", "new"],
+                rating: 4.8,
+                reviews: 24
+            },
+            {
+                id: 2,
+                name: "UI Kit - Modern Design",
+                description: "Customizable components for modern applications",
+                price: 900,
+                image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                category: "ui-kit",
+                tags: ["new"],
+                rating: 4.5,
+                reviews: 18
+            },
+            {
+                id: 3,
+                name: "Application Backend",
+                description: "JSP + Oracle setup service",
+                price: 5000,
+                image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                category: "service",
+                tags: ["bestseller"],
+                rating: 4.9,
+                reviews: 32
+            },
+            {
+                id: 4,
+                name: "Business Card Design",
+                description: "Professional business card design",
+                price: 700,
+                image: "https://images.unsplash.com/photo-1601935111741-ae98b2b230b0?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                category: "design",
+                tags: [],
+                rating: 4.3,
+                reviews: 12
+            },
+            {
+                id: 5,
+                name: "E-commerce Website",
+                description: "Complete e-commerce solution with admin panel",
+                price: 8000,
+                image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                category: "template",
+                tags: ["bestseller"],
+                rating: 4.7,
+                reviews: 41
+            },
+            {
+                id: 6,
+                name: "Mobile App UI",
+                description: "Figma UI kit for mobile applications",
+                price: 1200,
+                image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80",
+                category: "ui-kit",
+                tags: ["new"],
+                rating: 4.6,
+                reviews: 15
+            }
+        ];
+
+        // Service details data
+        const serviceDetails = {
+            "web-development": {
+                title: "Web Development",
+                subtitle: "Custom websites and web applications",
+                description: "We build responsive, scalable websites and web applications using modern technologies. From simple landing pages to complex enterprise solutions, we deliver quality code that meets your requirements.",
+                features: [
+                    "Responsive design that works on all devices",
+                    "Clean, maintainable code following best practices",
+                    "Database design and implementation",
+                    "API development and integration",
+                    "Performance optimization",
+                    "Security implementation and testing",
+                    "Cross-browser compatibility",
+                    "SEO-friendly structure"
+                ],
+                technologies: ["HTML5/CSS3", "JavaScript", "React", "Vue.js", "Node.js", "PHP", "Java", "Python", "MySQL", "MongoDB"],
+                pricing: [
+                    {
+                        name: "Basic Website",
+                        price: "৳5,000",
+                        description: "Simple 5-page website with contact form",
+                        features: ["5 Pages", "Contact Form", "Basic SEO", "1 Month Support"]
+                    },
+                    {
+                        name: "Business Website",
+                        price: "৳15,000",
+                        description: "Custom business website with CMS",
+                        features: ["Up to 15 Pages", "Content Management", "Advanced SEO", "3 Months Support", "Mobile Responsive"],
+                        popular: true
+                    },
+                    {
+                        name: "Web Application",
+                        price: "৳25,000+",
+                        description: "Custom web application with database",
+                        features: ["Custom Features", "User Authentication", "Database Integration", "Admin Panel", "6 Months Support"]
+                    }
+                ],
+                deliveryTime: "7-21 days",
+                support: "3-6 months free support"
+            },
+            "ui-design": {
+                title: "UI/UX Design",
+                subtitle: "Beautiful and user-friendly interfaces",
+                description: "We create visually appealing and intuitive user interfaces that enhance user experience. Our designs are not just beautiful but also functional and aligned with your business goals.",
+                features: [
+                    "User research and persona development",
+                    "Wireframing and prototyping",
+                    "Visual design and branding",
+                    "Interactive prototypes",
+                    "User testing and feedback implementation",
+                    "Design system creation",
+                    "Mobile-first approach",
+                    "Accessibility compliance"
+                ],
+                technologies: ["Figma", "Adobe XD", "Sketch", "InVision", "Photoshop", "Illustrator"],
+                pricing: [
+                    {
+                        name: "Basic Design",
+                        price: "৳3,000",
+                        description: "5 screen designs for web or mobile",
+                        features: ["5 Screens", "Style Guide", "1 Revision", "1 Week Delivery"]
+                    },
+                    {
+                        name: "Complete Design",
+                        price: "৳8,000",
+                        description: "Full application design with prototype",
+                        features: ["Up to 20 Screens", "Interactive Prototype", "3 Revisions", "Style Guide", "2 Weeks Delivery"],
+                        popular: true
+                    },
+                    {
+                        name: "Enterprise Design",
+                        price: "৳15,000+",
+                        description: "Complete design system and branding",
+                        features: ["Unlimited Screens", "Design System", "Brand Guidelines", "5 Revisions", "User Testing"]
+                    }
+                ],
+                deliveryTime: "1-3 weeks",
+                support: "2 months free support"
+            },
+            "mobile-apps": {
+                title: "Mobile App Development",
+                subtitle: "Native and cross-platform mobile applications",
+                description: "We develop high-performance mobile applications for iOS and Android platforms. Whether you need a native or cross-platform solution, we deliver apps that provide excellent user experience.",
+                features: [
+                    "Native iOS and Android development",
+                    "Cross-platform development with React Native/Flutter",
+                    "UI/UX design optimized for mobile",
+                    "API integration",
+                    "Push notifications",
+                    "Offline functionality",
+                    "App store deployment",
+                    "Performance optimization"
+                ],
+                technologies: ["Swift", "Kotlin", "Java", "React Native", "Flutter", "Firebase", "REST APIs"],
+                pricing: [
+                    {
+                        name: "Basic App",
+                        price: "৳20,000",
+                        description: "Simple mobile app with basic features",
+                        features: ["Up to 5 Screens", "Basic UI", "1 Platform", "2 Months Support"]
+                    },
+                    {
+                        name: "Standard App",
+                        price: "৳40,000",
+                        description: "Feature-rich app with backend",
+                        features: ["Up to 15 Screens", "Custom UI/UX", "2 Platforms", "API Integration", "4 Months Support"],
+                        popular: true
+                    },
+                    {
+                        name: "Enterprise App",
+                        price: "৳70,000+",
+                        description: "Complex app with advanced features",
+                        features: ["Unlimited Screens", "Advanced Features", "Both Platforms", "Custom Backend", "6 Months Support"]
+                    }
+                ],
+                deliveryTime: "3-8 weeks",
+                support: "4-6 months free support"
+            },
+            "ready-products": {
+                title: "Ready-to-Sell Products",
+                subtitle: "Templates, themes, and digital products",
+                description: "We offer a variety of ready-made digital products that you can purchase and use immediately. These products are perfect for businesses and individuals looking for quick solutions.",
+                features: [
+                    "Fully customizable templates",
+                    "Documentation and support",
+                    "Regular updates",
+                    "Source code included",
+                    "Commercial license",
+                    "Responsive design",
+                    "SEO optimized",
+                    "Cross-browser compatible"
+                ],
+                categories: ["Website Templates", "UI Kits", "WordPress Themes", "Admin Dashboards", "Email Templates", "Icon Sets"],
+                pricing: [
+                    {
+                        name: "Website Template",
+                        price: "৳2,000",
+                        description: "Responsive HTML template",
+                        features: ["Fully Responsive", "Clean Code", "Documentation", "6 Months Updates"]
+                    },
+                    {
+                        name: "UI Kit",
+                        price: "৳3,500",
+                        description: "Complete UI kit with components",
+                        features: ["50+ Components", "Figma Files", "Customizable", "1 Year Updates"],
+                        popular: true
+                    },
+                    {
+                        name: "WordPress Theme",
+                        price: "৳5,000",
+                        description: "Customizable WordPress theme",
+                        features: ["Theme Customizer", "WooCommerce Ready", "Page Builder", "Lifetime Updates"]
+                    }
+                ],
+                deliveryTime: "Instant download",
+                support: "6-12 months support"
+            }
+        };
+
+        // Cart functionality
+        let cart = [];
+        const cartBtn = document.getElementById('cartBtn');
+        const cartModal = document.getElementById('cartModal');
+        const cartItems = document.getElementById('cartItems');
+        const cartTotalEl = document.getElementById('cartTotal');
+        const closeCart = document.getElementById('closeCart');
+        const closeCartBtn = document.getElementById('closeCartBtn');
+        const floatingCartBtn = document.getElementById('floatingCartBtn');
+        const cartCount = document.getElementById('cartCount');
+        const floatingCartCount = document.getElementById('floatingCartCount');
+        const checkoutBtn = document.getElementById('checkoutBtn');
+        const sortSelect = document.getElementById('sortSelect');
+        const productsContainer = document.getElementById('productsContainer');
+        const contactForm = document.getElementById('contactForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Service modal elements
+        const serviceModal = document.getElementById('serviceModal');
+        const serviceModalTitle = document.getElementById('serviceModalTitle');
+        const serviceModalSubtitle = document.getElementById('serviceModalSubtitle');
+        const serviceModalContent = document.getElementById('serviceModalContent');
+        const closeServiceModal = document.getElementById('closeServiceModal');
+
+        // Auth elements
+        const authModal = document.getElementById('authModal');
+        const authModalTitle = document.getElementById('authModalTitle');
+        const closeAuthModal = document.getElementById('closeAuthModal');
+        const loginTab = document.getElementById('loginTab');
+        const signupTab = document.getElementById('signupTab');
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+        const signupSubmitBtn = document.getElementById('signupSubmitBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const signupBtn = document.getElementById('signupBtn');
+        const mobileLoginBtn = document.getElementById('mobileLoginBtn');
+        const mobileSignupBtn = document.getElementById('mobileSignupBtn');
+        const authButtons = document.getElementById('authButtons');
+        const userProfile = document.getElementById('userProfile');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const userDropdown = document.getElementById('userDropdown');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const mobileUserProfile = document.getElementById('mobileUserProfile');
+        const mobileUserAvatar = document.getElementById('mobileUserAvatar');
+        const mobileUserName = document.getElementById('mobileUserName');
+        const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            renderProducts();
+            setupEventListeners();
+            checkAuthState();
+        });
+
+        // Check authentication state
+        function checkAuthState() {
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    // User is signed in
+                    updateUIForUser(user);
+                    saveUserData(user);
+                } else {
+                    // User is signed out
+                    updateUIForGuest();
+                }
+            });
+        }
+
+        // Update UI for logged in user
+        function updateUIForUser(user) {
+            authButtons.classList.add('hidden');
+            userProfile.classList.remove('hidden');
+            mobileUserProfile.classList.remove('hidden');
+            mobileAuthButtons.classList.add('hidden');
+            
+            const displayName = user.displayName || user.email.split('@')[0];
+            const firstLetter = displayName.charAt(0).toUpperCase();
+            
+            userAvatar.textContent = firstLetter;
+            mobileUserAvatar.textContent = firstLetter;
+            userName.textContent = displayName;
+            mobileUserName.textContent = displayName;
+        }
+
+        // Update UI for guest
+        function updateUIForGuest() {
+            authButtons.classList.remove('hidden');
+            userProfile.classList.add('hidden');
+            mobileUserProfile.classList.add('hidden');
+            mobileAuthButtons.classList.remove('hidden');
+        }
+
+        // Save user data to Firestore
+        function saveUserData(user) {
+            const userData = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            db.collection('users').doc(user.uid).set(userData, { merge: true })
+                .then(() => {
+                    console.log('User data saved successfully');
+                })
+                .catch(error => {
+                    console.error('Error saving user data:', error);
+                });
+        }
+
+        // Show auth modal
+        function showAuthModal(isLogin = true) {
+            authModal.classList.remove('hidden');
+            
+            if (isLogin) {
+                loginTab.classList.add('active');
+                signupTab.classList.remove('active');
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                authModalTitle.textContent = 'Login to Your Account';
+            } else {
+                loginTab.classList.remove('active');
+                signupTab.classList.add('active');
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                authModalTitle.textContent = 'Create Your Account';
+            }
+        }
+
+        // Handle login
+        function handleLogin(email, password) {
+            loginSubmitBtn.innerHTML = '<div class="loading-spinner"></div> Logging in...';
+            loginSubmitBtn.disabled = true;
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Signed in
+                    const user = userCredential.user;
+                    authModal.classList.add('hidden');
+                    showNotification(`Welcome back, ${user.displayName || user.email}!`);
+                })
+                .catch((error) => {
+                    const errorCode = error.code;
+                    let errorMessage = 'An error occurred during login.';
+                    
+                    if (errorCode === 'auth/invalid-email') {
+                        errorMessage = 'Invalid email address.';
+                    } else if (errorCode === 'auth/user-disabled') {
+                        errorMessage = 'This account has been disabled.';
+                    } else if (errorCode === 'auth/user-not-found') {
+                        errorMessage = 'No account found with this email.';
+                    } else if (errorCode === 'auth/wrong-password') {
+                        errorMessage = 'Incorrect password.';
+                    }
+                    
+                    showNotification(errorMessage, 'error');
+                })
+                .finally(() => {
+                    loginSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                    loginSubmitBtn.disabled = false;
+                });
+        }
+
+        // Handle signup
+        function handleSignup(name, email, password) {
+            signupSubmitBtn.innerHTML = '<div class="loading-spinner"></div> Creating account...';
+            signupSubmitBtn.disabled = true;
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Signed up
+                    const user = userCredential.user;
+                    
+                    // Update profile with display name
+                    return user.updateProfile({
+                        displayName: name
+                    }).then(() => {
+                        authModal.classList.add('hidden');
+                        showNotification(`Welcome to ProjectShop, ${name}!`);
+                    });
+                })
+                .catch((error) => {
+                    const errorCode = error.code;
+                    let errorMessage = 'An error occurred during signup.';
+                    
+                    if (errorCode === 'auth/email-already-in-use') {
+                        errorMessage = 'An account with this email already exists.';
+                    } else if (errorCode === 'auth/invalid-email') {
+                        errorMessage = 'Invalid email address.';
+                    } else if (errorCode === 'auth/weak-password') {
+                        errorMessage = 'Password should be at least 6 characters.';
+                    }
+                    
+                    showNotification(errorMessage, 'error');
+                })
+                .finally(() => {
+                    signupSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+                    signupSubmitBtn.disabled = false;
+                });
+        }
+
+        // Handle logout
+        function handleLogout() {
+            auth.signOut().then(() => {
+                showNotification('You have been logged out.');
+            }).catch((error) => {
+                console.error('Error signing out:', error);
+                showNotification('Error logging out. Please try again.', 'error');
+            });
+        }
+
+        // Render products to the page
+        function renderProducts() {
+            productsContainer.innerHTML = '';
+            
+            // Sort products based on selection
+            let sortedProducts = [...products];
+            const sortValue = sortSelect.value;
+            
+            if (sortValue === 'bestselling') {
+                sortedProducts.sort((a, b) => b.reviews - a.reviews);
+            } else if (sortValue === 'price-low') {
+                sortedProducts.sort((a, b) => a.price - b.price);
+            } else if (sortValue === 'price-high') {
+                sortedProducts.sort((a, b) => b.price - a.price);
+            }
+            // Default is newest (original order)
+            
+            sortedProducts.forEach(product => {
+                const productCard = document.createElement('article');
+                productCard.className = 'bg-white rounded-xl shadow overflow-hidden product-card border border-slate-100';
+                
+                let tagHtml = '';
+                if (product.tags.includes('bestseller')) {
+                    tagHtml = '<div class="absolute top-2 right-2 bg-indigo-600 text-white text-xs px-2 py-1 rounded">Bestseller</div>';
+                } else if (product.tags.includes('new')) {
+                    tagHtml = '<div class="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">New</div>';
+                }
+                
+                productCard.innerHTML = `
+                    <div class="relative">
+                        <img src="${product.image}" alt="${product.name}" class="w-full h-44 object-cover">
+                        ${tagHtml}
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-semibold">${product.name}</h3>
+                        <p class="text-slate-500 text-sm mt-1">${product.description}</p>
+                        <div class="mt-2 flex items-center">
+                            <div class="text-yellow-400 text-sm">
+                                ${generateStarRating(product.rating)}
+                            </div>
+                            <span class="text-slate-500 text-sm ml-1">(${product.reviews})</span>
+                        </div>
+                        <div class="mt-3 flex items-center justify-between">
+                            <div class="font-bold text-lg">$${product.price}</div>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-1 border rounded text-sm hover:bg-slate-50 transition-colors view-details" data-id="${product.id}">Details</button>
+                                <button class="px-3 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition-colors add-to-cart" data-id="${product.id}">Add to Cart</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                productsContainer.appendChild(productCard);
+            });
+            
+            // Add event listeners to the new buttons
+            document.querySelectorAll('.add-to-cart').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const productId = parseInt(this.dataset.id);
+                    addToCart(productId);
+                });
+            });
+            
+            document.querySelectorAll('.view-details').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const productId = parseInt(this.dataset.id);
+                    viewProductDetails(productId);
+                });
+            });
+        }
+
+        // Generate star rating HTML
+        function generateStarRating(rating) {
+            let stars = '';
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 >= 0.5;
+            
+            for (let i = 0; i < fullStars; i++) {
+                stars += '<i class="fas fa-star"></i>';
+            }
+            
+            if (hasHalfStar) {
+                stars += '<i class="fas fa-star-half-alt"></i>';
+            }
+            
+            const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+            for (let i = 0; i < emptyStars; i++) {
+                stars += '<i class="far fa-star"></i>';
+            }
+            
+            return stars;
+        }
+
+        // View product details (placeholder function)
+        function viewProductDetails(productId) {
+            const product = products.find(p => p.id === productId);
+            if (product) {
+                alert(`Product Details:\n\nName: ${product.name}\nDescription: ${product.description}\nPrice: $${product.price}\nRating: ${product.rating}/5 (${product.reviews} reviews)`);
+            }
+        }
+
+        // Show service details modal
+        function showServiceDetails(serviceId) {
+            const service = serviceDetails[serviceId];
+            if (!service) return;
+            
+            serviceModalTitle.textContent = service.title;
+            serviceModalSubtitle.textContent = service.subtitle;
+            
+            let pricingHtml = '';
+            service.pricing.forEach(plan => {
+                pricingHtml += `
+                    <div class="pricing-card ${plan.popular ? 'popular' : ''}">
+                        ${plan.popular ? '<div class="popular-badge">Most Popular</div>' : ''}
+                        <h4 class="font-bold text-lg">${plan.name}</h4>
+                        <div class="my-2">
+                            <span class="text-2xl font-bold text-indigo-600">${plan.price}</span>
+                        </div>
+                        <p class="text-slate-600 text-sm mb-3">${plan.description}</p>
+                        <ul class="text-sm text-slate-600 space-y-1">
+                            ${plan.features.map(feature => `<li>• ${feature}</li>`).join('')}
+                        </ul>
+                        <button class="mt-4 w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+                            Select Plan
+                        </button>
+                    </div>
+                `;
+            });
+            
+            serviceModalContent.innerHTML = `
+                <div class="mb-6">
+                    <p class="text-slate-700">${service.description}</p>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-semibold text-lg mb-3">Key Features</h4>
+                    <div class="space-y-2">
+                        ${service.features.map(feature => `
+                            <div class="service-feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>${feature}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-semibold text-lg mb-3">Technologies & Tools</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${service.technologies.map(tech => `
+                            <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">${tech}</span>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-semibold text-lg mb-3">Pricing Plans</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        ${pricingHtml}
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap gap-6 text-sm">
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-indigo-600 mr-2"></i>
+                        <span><strong>Delivery Time:</strong> ${service.deliveryTime}</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-headset text-indigo-600 mr-2"></i>
+                        <span><strong>Support:</strong> ${service.support}</span>
+                    </div>
+                </div>
+                
+                <div class="mt-8 pt-6 border-t border-slate-200">
+                    <button class="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-paper-plane"></i> Contact Us to Get Started
+                    </button>
+                </div>
+            `;
+            
+            serviceModal.classList.remove('hidden');
+        }
+
+        // Add product to cart
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (product) {
+                cart.push({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    image: product.image
+                });
+                updateCartUI();
+                
+                // Show notification
+                showNotification(`${product.name} added to cart`);
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            // Remove existing notification if any
+            const existingNotification = document.querySelector('.cart-notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            const notification = document.createElement('div');
+            notification.className = `cart-notification ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-2 rounded-lg shadow-lg`;
+            notification.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'} mr-2"></i> ${message}`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Update cart UI
+        function updateCartUI() {
+            cartCount.textContent = cart.length;
+            floatingCartCount.textContent = cart.length;
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<div class="text-center py-8 text-slate-500">Your cart is empty</div>';
+                cartTotalEl.textContent = '0';
+            } else {
+                cartItems.innerHTML = '';
+                let total = 0;
+                cart.forEach((item, idx) => {
+                    total += Number(item.price);
+                    const el = document.createElement('div');
+                    el.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-lg';
+                    el.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <img src="${item.image}" alt="${item.name}" class="w-10 h-10 object-cover rounded">
+                            <div class="flex-1">
+                                <div class="font-medium text-sm">${item.name}</div>
+                                <div class="text-slate-500 text-sm">$${item.price}</div>
+                            </div>
+                        </div>
+                        <button class="text-red-500 hover:text-red-700 remove-from-cart" data-index="${idx}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    `;
+                    cartItems.appendChild(el);
+                });
+                cartTotalEl.textContent = total;
+                
+                // Add event listeners to remove buttons
+                document.querySelectorAll('.remove-from-cart').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const index = parseInt(e.currentTarget.dataset.index);
+                        cart.splice(index, 1);
+                        updateCartUI();
+                    });
+                });
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Mobile menu toggle
+            document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                document.getElementById('mobileMenu').classList.toggle('hidden');
+            });
+
+            // Cart functionality
+            cartBtn.addEventListener('click', () => {
+                cartModal.classList.remove('hidden');
+                cartModal.classList.add('flex');
+                updateCartUI();
+            });
+
+            floatingCartBtn.addEventListener('click', () => {
+                cartModal.classList.remove('hidden');
+                cartModal.classList.add('flex');
+                updateCartUI();
+            });
+
+            closeCart.addEventListener('click', () => {
+                cartModal.classList.add('hidden');
+                cartModal.classList.remove('flex');
+            });
+
+            closeCartBtn.addEventListener('click', () => {
+                cartModal.classList.add('hidden');
+                cartModal.classList.remove('flex');
+            });
+
+            // Close modal when clicking outside
+            cartModal.addEventListener('click', (e) => {
+                if (e.target === cartModal) {
+                    cartModal.classList.add('hidden');
+                    cartModal.classList.remove('flex');
+                }
+            });
+
+            // Service modal functionality
+            document.querySelectorAll('.service-details-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const serviceId = this.dataset.service;
+                    showServiceDetails(serviceId);
+                });
+            });
+
+            closeServiceModal.addEventListener('click', () => {
+                serviceModal.classList.add('hidden');
+            });
+
+            serviceModal.addEventListener('click', (e) => {
+                if (e.target === serviceModal) {
+                    serviceModal.classList.add('hidden');
+                    }
+            });
+
+            // Auth modal functionality
+            loginBtn.addEventListener('click', () => showAuthModal(true));
+            signupBtn.addEventListener('click', () => showAuthModal(false));
+            mobileLoginBtn.addEventListener('click', () => showAuthModal(true));
+            mobileSignupBtn.addEventListener('click', () => showAuthModal(false));
+
+            closeAuthModal.addEventListener('click', () => {
+                authModal.classList.add('hidden');
+            });
+
+            authModal.addEventListener('click', (e) => {
+                if (e.target === authModal) {
+                    authModal.classList.add('hidden');
+                }
+            });
+
+            // Auth tabs
+            loginTab.addEventListener('click', () => {
+                loginTab.classList.add('active');
+                signupTab.classList.remove('active');
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                authModalTitle.textContent = 'Login to Your Account';
+            });
+
+            signupTab.addEventListener('click', () => {
+                loginTab.classList.remove('active');
+                signupTab.classList.add('active');
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                authModalTitle.textContent = 'Create Your Account';
+            });
+
+            // Login form submission
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                handleLogin(email, password);
+            });
+
+            // Signup form submission
+            signupForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPassword').value;
+                const confirmPassword = document.getElementById('signupConfirmPassword').value;
+                
+                if (password !== confirmPassword) {
+                    showNotification('Passwords do not match.', 'error');
+                    return;
+                }
+                
+                handleSignup(name, email, password);
+            });
+
+            // User dropdown
+            userAvatar.addEventListener('click', () => {
+                userDropdown.classList.toggle('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!userProfile.contains(e.target)) {
+                    userDropdown.classList.remove('show');
+                }
+            });
+
+            // Logout
+            logoutBtn.addEventListener('click', handleLogout);
+            mobileLogoutBtn.addEventListener('click', handleLogout);
+
+            // Sort products
+            sortSelect.addEventListener('change', renderProducts);
+
+            // Checkout button
+            checkoutBtn.addEventListener('click', () => {
+                if (cart.length === 0) {
+                    alert('Your cart is empty!');
+                    return;
+                }
+                
+                // Show loading state
+                checkoutBtn.innerHTML = '<div class="loading-spinner"></div> Processing...';
+                checkoutBtn.disabled = true;
+                
+                // Simulate checkout process
+                setTimeout(() => {
+                    alert('Checkout completed successfully! Thank you for your purchase.');
+                    cart = [];
+                    updateCartUI();
+                    cartModal.classList.add('hidden');
+                    cartModal.classList.remove('flex');
+                    
+                    // Reset checkout button
+                    checkoutBtn.innerHTML = 'Checkout';
+                    checkoutBtn.disabled = false;
+                }, 2000);
+            });
+
+            // Contact form submission
+            contactForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('nameInput').value;
+                const contact = document.getElementById('contactInput').value;
+                const subject = document.getElementById('subjectInput').value;
+                const message = document.getElementById('messageInput').value;
+                
+                // Show loading state
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<div class="loading-spinner"></div> Sending...';
+                submitBtn.disabled = true;
+                
+                // Simulate form submission
+                setTimeout(() => {
+                    alert(`Thank you, ${name}! Your message has been sent. We'll contact you at ${contact} soon.`);
+                    contactForm.reset();
+                    
+                    // Reset button
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 2000);
+            });
+
+            // Smooth scrolling for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+        }
+
+        // Add fade-in animation to elements when they come into view
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                }
+            });
+        }, observerOptions);
+
+        // Observe elements for animation
+        document.querySelectorAll('section').forEach(section => {
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
